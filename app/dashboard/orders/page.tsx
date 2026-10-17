@@ -13,6 +13,7 @@ type Order = {
   id: string
   table_id: string
   status: string
+  pin: string | null
   created_at: string
   order_items: OrderItem[]
 }
@@ -44,6 +45,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [tablesMap, setTablesMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  const [pinQuery, setPinQuery] = useState('')
   const [notifStatus, setNotifStatus] = useState<NotificationPermission | 'unsupported'>('default')
   const userIdRef = useRef<string | null>(null)
 
@@ -163,6 +165,8 @@ export default function OrdersPage() {
     }
   }
 
+  const visibleOrders = pinQuery.length === 2 ? orders.filter((o) => o.pin === pinQuery) : orders
+
   if (loading) return <div className="dash-body">Loading orders…</div>
 
   return (
@@ -179,17 +183,42 @@ export default function OrdersPage() {
         </div>
       )}
 
+      <div className="pin-lookup">
+        <label htmlFor="pin-check">Check PIN</label>
+        <input
+          id="pin-check"
+          className="field-input"
+          inputMode="numeric"
+          maxLength={2}
+          placeholder="00"
+          value={pinQuery}
+          onChange={(e) => setPinQuery(e.target.value.replace(/\D/g, '').slice(0, 2))}
+        />
+        <span className="pin-result">
+          {pinQuery.length < 2
+            ? "Type the 2 digits the customer tells you."
+            : visibleOrders.length === 0
+              ? 'No active order has this PIN.'
+              : visibleOrders.length === 1
+                ? '1 order matches.'
+                : `${visibleOrders.length} orders share this PIN - check the table number.`}
+        </span>
+      </div>
+
       {orders.length === 0 && <p className="empty-note">No active orders right now.</p>}
 
-      {orders.map((order) => {
+      {visibleOrders.map((order) => {
         const total = order.order_items.reduce(
           (sum, i) => sum + (i.price_snapshot ?? 0) * i.quantity,
           0
         )
         return (
-          <div key={order.id} className="order-card">
+          <div key={order.id} className={`order-card ${pinQuery.length === 2 ? 'is-match' : ''}`}>
             <div className="order-card-head">
-              <span className="order-table-badge">Table {tablesMap[order.table_id] ?? '?'}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="order-table-badge">Table {tablesMap[order.table_id] ?? '?'}</span>
+                {order.pin && <span className="pin-badge">PIN {order.pin}</span>}
+              </span>
               <span className="order-time">{new Date(order.created_at).toLocaleTimeString()}</span>
             </div>
             {order.order_items.map((item) => (
@@ -222,6 +251,18 @@ export default function OrdersPage() {
                 Cancel
               </button>
             </div>
+            {pinQuery.length === 2 && (
+              <button
+                onClick={() => {
+                  setStatus(order.id, 'completed')
+                  setPinQuery('')
+                }}
+                className="btn btn-primary"
+                style={{ marginTop: 14 }}
+              >
+                PIN matches — hand over &amp; complete
+              </button>
+            )}
           </div>
         )
       })}
