@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Category = { id: string; name: string; sort_order: number }
@@ -11,6 +11,15 @@ type MenuItem = {
   price: number | null
   image_url: string | null
 }
+
+// 2-digit pickup PIN (10-99, no leading zero so it's easy to say aloud).
+function generatePin() {
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return String(10 + (buf[0] % 90))
+}
+
+const PIN_MAX_AGE_MS = 3 * 60 * 60 * 1000 // forget a saved PIN after 3 hours
 
 export default function OrderClient({
   ownerId,
@@ -35,6 +44,25 @@ export default function OrderClient({
   const [cart, setCart] = useState<Record<string, number>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [pin, setPin] = useState<string | null>(null)
+  const storageKey = `lastOrder:${tableId}`
+
+  // If the customer refreshes or comes back, show their PIN again.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (!saved) return
+      const parsed = JSON.parse(saved)
+      if (parsed?.pin && Date.now() - parsed.at < PIN_MAX_AGE_MS) {
+        setPin(parsed.pin)
+        setSubmitted(true)
+      } else {
+        localStorage.removeItem(storageKey)
+      }
+    } catch {
+      // storage unavailable - just show the normal menu
+    }
+  }, [storageKey])
   const [error, setError] = useState<string | null>(null)
 
   function changeQty(itemId: string, delta: number) {
@@ -64,10 +92,11 @@ export default function OrderClient({
     setError(null)
 
     const newOrderId = crypto.randomUUID()
+    const newPin = generatePin()
 
     const { error: orderError } = await supabase
       .from('orders')
-      .insert({ id: newOrderId, owner_id: ownerId, table_id: tableId, status: 'pending' })
+      .insert({ id: newOrderId, owner_id: ownerId, table_id: tableId, status: 'pending', pin: newPin })
 
     if (orderError) {
       setError('Could not send your order. Please try again.')
@@ -96,8 +125,25 @@ export default function OrderClient({
       return
     }
 
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ pin: newPin, at: Date.now() }))
+    } catch {
+      // storage unavailable - PIN is still shown on screen this session
+    }
+    setPin(newPin)
     setSubmitting(false)
     setSubmitted(true)
+  }
+
+  function startNewOrder() {
+    try {
+      localStorage.removeItem(storageKey)
+    } catch {
+      // ignore
+    }
+    setCart({})
+    setPin(null)
+    setSubmitted(false)
   }
 
   if (submitted) {
@@ -106,6 +152,18 @@ export default function OrderClient({
         <div className="order-success">
           <h1>Order sent</h1>
           <p>Table {tableNumber} — the kitchen has your order.</p>
+          {pin && (
+            <div className="pin-card">
+              <span className="pin-label">Your pickup PIN</span>
+              <span className="pin-number" aria-label={`PIN ${pin.split('').join(' ')}`}>
+                {pin}
+              </span>
+              <span className="pin-hint">Tell this number to the staff when you receive your order.</span>
+            </div>
+          )}
+          <button onClick={startNewOrder} className="btn btn-accent" style={{ marginTop: 28 }}>
+            Order something else
+          </button>
         </div>
       </div>
     )

@@ -406,6 +406,33 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .order-success h1 { font-family: var(--m-font-title); font-size: 30px; margin: 0 0 10px; }
 .order-success p { color: var(--m-dim); }
 
+/* ---------- Pickup PIN ---------- */
+.pin-card {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
+  margin-top: 28px; padding: 22px 40px 18px;
+  border: 2px dashed var(--m-line); border-radius: 14px;
+}
+.pin-label { font-size: 13px; color: var(--m-dim); letter-spacing: .04em; }
+.pin-number {
+  font-family: var(--m-font-title); font-weight: 700; font-size: 76px; line-height: 1;
+  color: var(--m-accent); letter-spacing: .12em; padding-left: .12em;
+}
+.pin-hint { font-size: 13px; color: var(--m-dim); max-width: 22ch; text-align: center; line-height: 1.4; }
+
+.pin-badge {
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+  background: var(--color-board); color: var(--color-chalk);
+  padding: 3px 10px; border-radius: 6px; letter-spacing: .06em;
+}
+.pin-lookup {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 24px;
+  padding: 14px 18px; background: var(--color-paper-2); border-radius: var(--radius-md);
+}
+.pin-lookup label { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.pin-lookup input { width: 84px; text-align: center; font-size: 20px; letter-spacing: .15em; }
+.pin-lookup .pin-result { font-size: 13px; color: var(--color-ink-dim); }
+.order-card.is-match { border-color: var(--color-mustard-dark); box-shadow: 0 0 0 2px var(--color-mustard); }
+
 /* ---------- Theme picker (dashboard settings) ---------- */
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 .theme-option {

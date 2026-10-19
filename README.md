@@ -30,6 +30,12 @@ npm install
    If Realtime still doesn't seem to fire later, double check it's on:
    Supabase Dashboard → **Database → Replication** → make sure `orders`
    is toggled on.
+4. Run `supabase/pin_schema.sql` too. It adds the 2-digit pickup PIN
+   column to `orders`. After a customer places an order they see their PIN
+   (e.g. **47**); when they collect it, staff type those 2 digits into
+   **Check PIN** on the Orders page, which finds the matching order and
+   offers a one-tap hand-over. Two active orders can occasionally share a
+   PIN (only 90 values), so every order card also shows its table number.
 
 ## 4. Set up real push notifications (works even with the site closed)
 
@@ -197,6 +203,7 @@ middleware.ts                 -> redirects unauthenticated users away from /dash
 supabase/
   schema.sql                  -> profiles, categories, menu_items (run first)
   orders_schema.sql           -> tables, orders, order_items + realtime (run second)
+  pin_schema.sql              -> 2-digit pickup PIN column on orders
 ```
 
 ## Notes
