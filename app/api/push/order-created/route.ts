@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
+import { sendTelegramMessage } from '@/lib/telegram'
 
 // This route is called by a Supabase Database Webhook the instant a new
 // row is inserted into `orders`. It runs on Netlify's servers, independent
@@ -39,34 +40,29 @@ export async function POST(request: Request) {
     .eq('id', order.table_id)
     .single()
 
-  const { data: profile } = await supabaseAdmin
+  // Telegram: report exactly why it did or didn't send. This text ends up in
+  // net._http_response.content, so it can be read straight from SQL.
+  let telegram = 'skipped'
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('telegram_chat_id')
     .eq('id', order.owner_id)
     .single()
 
-  let telegramSent = false
-  if (profile?.telegram_chat_id && process.env.TELEGRAM_BOT_TOKEN) {
-    try {
-      const res = await fetch(
-        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: profile.telegram_chat_id,
-            text: `🔔 New order — Table ${table?.table_number ?? '?'}`,
-          }),
-        }
-      )
-      telegramSent = res.ok
-      if (!res.ok) {
-        console.error('Telegram send failed:', await res.text())
-      }
-    } catch (err) {
-      console.error('Telegram send threw:', err)
-    }
+  if (profileError) {
+    telegram = `profile lookup failed: ${profileError.message}`
+    console.error('Telegram: profile lookup failed:', profileError)
+  } else if (!profile?.telegram_chat_id) {
+    telegram = 'no telegram chat id saved in Settings'
+  } else {
+    const result = await sendTelegramMessage(
+      profile.telegram_chat_id,
+      `🔔 New order — Table ${table?.table_number ?? '?'}${order.pin ? ` (PIN ${order.pin})` : ''}`
+    )
+    telegram = result.ok ? 'sent' : result.detail
+    if (!result.ok) console.error('Telegram:', result.detail)
   }
+  const telegramSent = telegram === 'sent'
 
   const { data: subscriptions } = await supabaseAdmin
     .from('push_subscriptions')
@@ -74,7 +70,7 @@ export async function POST(request: Request) {
     .eq('owner_id', order.owner_id)
 
   if (!subscriptions || subscriptions.length === 0) {
-    return NextResponse.json({ sent: 0, telegramSent })
+    return NextResponse.json({ sent: 0, telegramSent, telegram })
   }
 
   const notificationPayload = JSON.stringify({
@@ -105,5 +101,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ sent, telegramSent })
+  return NextResponse.json({ sent, telegramSent, telegram })
 }

@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [telegramChatId, setTelegramChatId] = useState('')
   const [theme, setTheme] = useState(DEFAULT_THEME)
+  const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -46,6 +47,18 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
+  async function sendTelegramTest() {
+    setTesting(true)
+    try {
+      const res = await fetch('/api/telegram/test', { method: 'POST' })
+      const data = await res.json()
+      alert(data.ok ? 'Test message sent. Check Telegram.' : `Telegram test failed: ${data.detail}`)
+    } catch {
+      alert('Telegram test failed: could not reach the server.')
+    }
+    setTesting(false)
+  }
+
   async function save() {
     setSaving(true)
     const {
@@ -57,7 +70,12 @@ export default function SettingsPage() {
       .eq('id', user!.id)
     setSaving(false)
     if (error) {
-      alert('Save failed: ' + error.message + ' (slug may already be taken)')
+      const missingColumn = /column|schema cache/i.test(error.message)
+      alert(
+        missingColumn
+          ? 'Save failed: your database is missing a column (' + error.message + '). Run telegram_schema.sql and theme_schema.sql in the Supabase SQL Editor.'
+          : 'Save failed: ' + error.message + ' (slug may already be taken)'
+      )
     } else {
       alert('Saved!')
     }
@@ -105,8 +123,18 @@ export default function SettingsPage() {
             />
             <p className="field-hint">
               Get this by messaging your bot, then visiting
-              api.telegram.org/bot&lt;TOKEN&gt;/getUpdates in a browser.
+              api.telegram.org/bot&lt;TOKEN&gt;/getUpdates in a browser. Press
+              Save changes first, then send a test.
             </p>
+            <button
+              type="button"
+              onClick={sendTelegramTest}
+              disabled={testing}
+              className="btn btn-outline"
+              style={{ marginTop: 8 }}
+            >
+              {testing ? 'Sending…' : 'Send test message'}
+            </button>
           </div>
           <button onClick={save} disabled={saving} className="btn btn-primary">
             {saving ? 'Saving…' : 'Save changes'}
